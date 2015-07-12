@@ -5,6 +5,8 @@ import android.content.ContentValues;
 import android.content.Intent;
 import android.database.Cursor;
 import android.net.Uri;
+import android.os.Bundle;
+import android.os.ResultReceiver;
 import android.support.v4.content.LocalBroadcastManager;
 import android.util.Log;
 
@@ -19,6 +21,7 @@ import java.io.InputStreamReader;
 import java.net.HttpURLConnection;
 import java.net.URL;
 
+import it.jaschke.alexandria.AddBook;
 import it.jaschke.alexandria.MainActivity;
 import it.jaschke.alexandria.R;
 import it.jaschke.alexandria.data.AlexandriaContract;
@@ -37,6 +40,7 @@ public class BookService extends IntentService {
     public static final String DELETE_BOOK = "it.jaschke.alexandria.services.action.DELETE_BOOK";
 
     public static final String EAN = "it.jaschke.alexandria.services.extra.EAN";
+    public static final String RESULT_RECEIVER = "it.jaschke.alexandria.services.extra.RESULT_RECEIVER";
 
     public BookService() {
         super("Alexandria");
@@ -48,7 +52,8 @@ public class BookService extends IntentService {
             final String action = intent.getAction();
             if (FETCH_BOOK.equals(action)) {
                 final String ean = intent.getStringExtra(EAN);
-                fetchBook(ean);
+                final ResultReceiver resultReceiver = intent.getParcelableExtra(RESULT_RECEIVER);
+                fetchBook(ean, resultReceiver);
             } else if (DELETE_BOOK.equals(action)) {
                 final String ean = intent.getStringExtra(EAN);
                 deleteBook(ean);
@@ -70,7 +75,7 @@ public class BookService extends IntentService {
      * Handle action fetchBook in the provided background thread with the provided
      * parameters.
      */
-    private void fetchBook(String ean) {
+    private void fetchBook(String ean, ResultReceiver resultReceiver) {
 
         if(ean.length()!=13){
             return;
@@ -195,6 +200,10 @@ public class BookService extends IntentService {
             if(bookInfo.has(CATEGORIES)){
                 writeBackCategories(ean,bookInfo.getJSONArray(CATEGORIES) );
             }
+
+            Bundle resultBundle = new Bundle();
+            resultBundle.putString(EAN, ean);
+            resultReceiver.send(AddBook.BookAddingListener.RESULT_CODE, resultBundle);
 
         } catch (JSONException e) {
             Log.e(LOG_TAG, "Error ", e);

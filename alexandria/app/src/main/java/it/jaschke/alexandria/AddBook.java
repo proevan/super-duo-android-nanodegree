@@ -1,9 +1,12 @@
 package it.jaschke.alexandria;
 
 import android.app.Activity;
+import android.content.Context;
 import android.content.Intent;
 import android.database.Cursor;
 import android.os.Bundle;
+import android.os.Handler;
+import android.os.ResultReceiver;
 import android.support.v4.app.Fragment;
 import android.support.v4.app.LoaderManager;
 import android.support.v4.content.CursorLoader;
@@ -35,7 +38,8 @@ public class AddBook extends Fragment implements LoaderManager.LoaderCallbacks<C
     private String mScanFormat = "Format:";
     private String mScanContents = "Contents:";
 
-
+    private BookAddingListener mBookAddingListener;
+    private String mCurrentAddedBookEAN = null;
 
     public AddBook(){
     }
@@ -46,6 +50,13 @@ public class AddBook extends Fragment implements LoaderManager.LoaderCallbacks<C
         if(ean!=null) {
             outState.putString(EAN_CONTENT, ean.getText().toString());
         }
+    }
+
+    @Override
+    public void onCreate(Bundle savedInstanceState) {
+        super.onCreate(savedInstanceState);
+        mBookAddingListener = new BookAddingListener(new Handler());
+        mBookAddingListener.setParentContext(getActivity());
     }
 
     @Override
@@ -81,6 +92,7 @@ public class AddBook extends Fragment implements LoaderManager.LoaderCallbacks<C
                 //Once we have an ISBN, start a book intent
                 Intent bookIntent = new Intent(getActivity(), BookService.class);
                 bookIntent.putExtra(BookService.EAN, ean);
+                bookIntent.putExtra(BookService.RESULT_RECEIVER, mBookAddingListener);
                 bookIntent.setAction(BookService.FETCH_BOOK);
                 getActivity().startService(bookIntent);
                 AddBook.this.restartLoader();
@@ -100,6 +112,7 @@ public class AddBook extends Fragment implements LoaderManager.LoaderCallbacks<C
             public void onClick(View view) {
                 ean.setText("");
                 ean.setError(null);
+                mCurrentAddedBookEAN = null;
                 clearFields();
             }
         });
@@ -107,11 +120,14 @@ public class AddBook extends Fragment implements LoaderManager.LoaderCallbacks<C
         rootView.findViewById(R.id.delete_button).setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View view) {
-                Intent bookIntent = new Intent(getActivity(), BookService.class);
-                bookIntent.putExtra(BookService.EAN, ean.getText().toString());
-                bookIntent.setAction(BookService.DELETE_BOOK);
-                getActivity().startService(bookIntent);
-                clearFields();
+                if (mCurrentAddedBookEAN != null) {
+                    Intent bookIntent = new Intent(getActivity(), BookService.class);
+                    bookIntent.putExtra(BookService.EAN, mCurrentAddedBookEAN);
+                    bookIntent.setAction(BookService.DELETE_BOOK);
+                    getActivity().startService(bookIntent);
+                    mCurrentAddedBookEAN = null;
+                    clearFields();
+                }
             }
         });
 
@@ -208,6 +224,26 @@ public class AddBook extends Fragment implements LoaderManager.LoaderCallbacks<C
                 String result = data.getStringExtra("result");
                 ean.setText(result);
             }
+        }
+    }
+
+    public class BookAddingListener extends ResultReceiver {
+
+        public static final int RESULT_CODE = 5566;
+
+        private Context context = null;
+
+        protected void setParentContext (Context context) {
+            this.context = context;
+        }
+
+        public BookAddingListener(Handler handler) {
+            super(handler);
+        }
+
+        @Override
+        protected void onReceiveResult (int resultCode, Bundle resultData) {
+            mCurrentAddedBookEAN = resultData.getString(BookService.EAN);
         }
     }
 }
