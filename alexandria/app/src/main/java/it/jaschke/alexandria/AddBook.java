@@ -4,6 +4,8 @@ import android.app.Activity;
 import android.content.Context;
 import android.content.Intent;
 import android.database.Cursor;
+import android.net.ConnectivityManager;
+import android.net.NetworkInfo;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.ResultReceiver;
@@ -19,6 +21,7 @@ import android.view.ViewGroup;
 import android.widget.EditText;
 import android.widget.ImageView;
 import android.widget.TextView;
+import android.widget.Toast;
 
 import it.jaschke.alexandria.data.AlexandriaContract;
 import it.jaschke.alexandria.services.BookService;
@@ -89,13 +92,22 @@ public class AddBook extends Fragment implements LoaderManager.LoaderCallbacks<C
                 } else {
                     AddBook.this.ean.setError(null);
                 }
-                //Once we have an ISBN, start a book intent
-                Intent bookIntent = new Intent(getActivity(), BookService.class);
-                bookIntent.putExtra(BookService.EAN, ean);
-                bookIntent.putExtra(BookService.RESULT_RECEIVER, mBookAddingListener);
-                bookIntent.setAction(BookService.FETCH_BOOK);
-                getActivity().startService(bookIntent);
-                AddBook.this.restartLoader();
+                ConnectivityManager cm =
+                        (ConnectivityManager)getActivity().getSystemService(Context.CONNECTIVITY_SERVICE);
+                NetworkInfo activeNetwork = cm.getActiveNetworkInfo();
+                boolean isConnected = activeNetwork != null &&
+                        activeNetwork.isConnectedOrConnecting();
+                if (isConnected) {
+                    //Once we have an ISBN, start a book intent
+                    Intent bookIntent = new Intent(getActivity(), BookService.class);
+                    bookIntent.putExtra(BookService.EAN, ean);
+                    bookIntent.putExtra(BookService.RESULT_RECEIVER, mBookAddingListener);
+                    bookIntent.setAction(BookService.FETCH_BOOK);
+                    getActivity().startService(bookIntent);
+                    AddBook.this.restartLoader();
+                } else {
+                    Toast.makeText(getActivity(), R.string.message_no_connection, Toast.LENGTH_SHORT).show();
+                }
             }
         });
 
